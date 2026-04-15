@@ -1,0 +1,53 @@
+\begin{thebibliography}{10}
+\providecommand{\natexlab}[1]{#1}
+
+\bibitem[{Bhagavatula et~al.(2020)Bhagavatula, Le~Bras, Malaviya, Sakaguchi, Holtzman, Rashkin, Downey, tau Yih, and Choi}]{bhagavatula2020abductivecommonsense}
+Chandra Bhagavatula, Ronan Le~Bras, Chaitanya Malaviya, Keisuke Sakaguchi, Ari Holtzman, Hannah Rashkin, Doug Downey, Wen tau Yih, and Yejin Choi. 2020.
+\newblock \href {https://arxiv.org/abs/1908.05739} {Abductive commonsense reasoning}.
+\newblock In \emph{International Conference on Learning Representations (ICLR)}.
+
+\bibitem[{Bruch et~al.(2022)Bruch, Gai, and Ingber}]{bruch2022analysis}
+Sebastian Bruch, Siyu Gai, and Amir Ingber. 2022.
+\newblock \href {https://arxiv.org/abs/2210.11934} {An analysis of fusion functions for hybrid retrieval}.
+\newblock \emph{arXiv preprint}.
+
+\bibitem[{Cormack et~al.(2009)Cormack, Clarke, and Büttcher}]{cormack2009reciprocal}
+Gordon~V. Cormack, Charles L.~A. Clarke, and Stefan Büttcher. 2009.
+\newblock \href {https://doi.org/10.1145/1571941.1572114} {Reciprocal rank fusion outperforms condorcet and individual ranker methods}.
+\newblock In \emph{Proceedings of the 32nd Annual International ACM SIGIR Conference on Research and Development in Information Retrieval}, pages 758--759. ACM.
+
+\bibitem[{Karpukhin et~al.(2020)Karpukhin, Oguz, Min, Lewis, Wu, Edunov, Chen, and Yih}]{karpukhin2020dense}
+Vladimir Karpukhin, Barlas Oguz, Sewon Min, Patrick Lewis, Ledell Wu, Sergey Edunov, Danqi Chen, and Wen-tau Yih. 2020.
+\newblock \href {https://arxiv.org/abs/2004.04906} {Dense passage retrieval for open-domain question answering}.
+\newblock In \emph{Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing (EMNLP)}, pages 6769--6781. Association for Computational Linguistics.
+
+\bibitem[{Reimers and Gurevych(2019)}]{reimers2019sentence}
+Nils Reimers and Iryna Gurevych. 2019.
+\newblock \href {https://arxiv.org/abs/1908.10084} {Sentence-bert: Sentence embeddings using siamese bert-networks}.
+\newblock In \emph{Proceedings of EMNLP-IJCNLP}.
+
+\bibitem[{Robertson and Zaragoza(2009)}]{robertson2009probabilistic}
+Stephen Robertson and Hugo Zaragoza. 2009.
+\newblock \href {https://www.researchgate.net/publication/220613776_The_Probabilistic_Relevance_Framework_BM25_and_Beyond} {The probabilistic relevance framework: Bm25 and beyond}.
+\newblock \emph{Foundations and Trends in Information Retrieval}.
+
+\bibitem[{Talmor et~al.(2019)Talmor, Herzig, Lourie, and Berant}]{talmor2019commonsenseqa}
+Alon Talmor, Jonathan Herzig, Nicholas Lourie, and Jonathan Berant. 2019.
+\newblock \href {https://arxiv.org/abs/1811.00937} {Commonsenseqa: A question answering challenge targeting commonsense knowledge}.
+
+\bibitem[{Wang et~al.(2022)Wang, Wei, Schuurmans, Le, and Zhou}]{wang2022selfconsistency}
+Xuezhi Wang, Jason Wei, Dale Schuurmans, Quoc~V. Le, and Denny Zhou. 2022.
+\newblock \href {https://arxiv.org/abs/2203.11171} {Self-consistency improves chain of thought reasoning in language models}.
+\newblock In \emph{Advances in Neural Information Processing Systems}.
+
+\bibitem[{Wei and et~al.(2022)}]{wei2022chain}
+Jason Wei and et~al. 2022.
+\newblock \href {https://arxiv.org/abs/2201.11903} {Chain-of-thought prompting elicits reasoning in large language models}.
+\newblock In \emph{NeurIPS}.
+
+\bibitem[{Zhou et~al.(2024)Zhou, Liu, Srivastava, Mei, and Tan}]{zhou2024hypothesis}
+Yangqiaoyu Zhou, Haokun Liu, Tejes Srivastava, Hongyuan Mei, and Chenhao Tan. 2024.
+\newblock \href {https://aclanthology.org/2024.nlp4science-1.10/?utm_source=chatgpt.com} {Hypothesis generation with large language models}.
+\newblock In \emph{Proceedings of the 1st Workshop on NLP for Science (NLP4Science)}.
+
+\end{thebibliography}

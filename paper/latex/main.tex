@@ -1,0 +1,328 @@
+\documentclass[11pt]{article}
+
+% Change "review" to "final" to generate the final (sometimes called camera-ready) version.
+% Change to "preprint" to generate a non-anonymous version with page numbers.
+\usepackage{acl}
+
+% Standard package includes
+\usepackage{times}
+\usepackage{lipsum}
+\usepackage{latexsym}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+% For proper rendering and hyphenation of words containing Latin characters (including in bib files)
+\usepackage[T1]{fontenc}
+% For Vietnamese characters
+% \usepackage[T5]{fontenc}
+% See https://www.latex-project.org/help/documentation/encguide.pdf for other character sets
+
+% This assumes your files are encoded as UTF8
+\usepackage[utf8]{inputenc}
+
+% This is not strictly necessary, and may be commented out,
+% but it will improve the layout of the manuscript,
+% and will typically save some space.
+\usepackage{microtype}
+
+% This is also not strictly necessary, and may be commented out.
+% However, it will improve the aesthetics of text in
+% the typewriter font.
+\usepackage{inconsolata}
+
+%Including images in your LaTeX document requires adding
+%additional package(s)
+\usepackage{graphicx}
+
+% If the title and author information does not fit in the area allocated, uncomment the following
+%
+\setlength\titlebox{6cm}
+%
+% and set <dim> to something 5cm or larger.
+
+\title{SC-Refine: Option-Level Self-Consistency with Hybrid Retrieval \\ for Abductive Event Reasoning}
+
+% Author information can be set in various styles:
+% For several authors from the same institution:
+% \author{Author 1 \and ... \and Author n \\
+%         Address line \\ ... \\ Address line}
+% if the names do not fit well on one line use
+%         Author 1 \\ {\bf Author 2} \\ ... \\ {\bf Author n} \\
+% For authors from different institutions:
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \And  ... \And
+%         Author n \\ Address line \\ ... \\ Address line}
+% To start a separate ``row'' of authors use \AND, as in
+% \author{Author 1 \\ Address line \\  ... \\ Address line
+%         \AND
+%         Author 2 \\ Address line \\ ... \\ Address line \And
+%         Author 3 \\ Address line \\ ... \\ Address line}
+%          \\}
+\author{Lan Deng \\ Politecnico di Torino \\ s338219
+        \And
+        Xueyufei Zhang \\ Politecnico di Torino \\ s336472
+        \And
+        Yufei Chen \\ Politecnico di Torino \\ s338116
+        \And
+        Chunyi Li \\ Politecnico di Torino \\ s338968
+        \AND
+        Javokhirbek Parpikhodjaev \\ Politecnico di Torino \\ s345099}
+
+%\author{
+%  \textbf{First Author\textsuperscript{1}},
+%  \textbf{Second Author\textsuperscript{1,2}},
+%  \textbf{Third T. Author\textsuperscript{1}},
+%  \textbf{Fourth Author\textsuperscript{1}},
+%\\
+%  \textbf{Fifth Author\textsuperscript{1,2}},
+%  \textbf{Sixth Author\textsuperscript{1}},
+%  \textbf{Seventh Author\textsuperscript{1}},
+%  \textbf{Eighth Author \textsuperscript{1,2,3,4}},
+%\\
+%  \textbf{Ninth Author\textsuperscript{1}},
+%  \textbf{Tenth Author\textsuperscript{1}},
+%  \textbf{Eleventh E. Author\textsuperscript{1,2,3,4,5}},
+%  \textbf{Twelfth Author\textsuperscript{1}},
+%\\
+%  \textbf{Thirteenth Author\textsuperscript{3}},
+%  \textbf{Fourteenth F. Author\textsuperscript{2,4}},
+%  \textbf{Fifteenth Author\textsuperscript{1}},
+%  \textbf{Sixteenth Author\textsuperscript{1}},
+%\\
+%  \textbf{Seventeenth S. Author\textsuperscript{4,5}},
+%  \textbf{Eighteenth Author\textsuperscript{3,4}},
+%  \textbf{Nineteenth N. Author\textsuperscript{2,5}},
+%  \textbf{Twentieth Author\textsuperscript{1}}
+%\\
+%\\
+%  \textsuperscript{1}Affiliation 1,
+%  \textsuperscript{2}Affiliation 2,
+%  \textsuperscript{3}Affiliation 3,
+%  \textsuperscript{4}Affiliation 4,
+%  \textsuperscript{5}Affiliation 5
+%\\
+%  \small{
+%    \textbf{Correspondence:} \href{mailto:email@domain}{email@domain}
+%  }
+%}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+This paper presents our system for SemEval-2026 Task 12: Abductive Event Reasoning. We propose \textbf{SC-Refine}, a Self-Consistency with Refinement approach designed to optimize for the task's unique partial matching metric. Our system employs a hybrid retrieval strategy to ground reasoning in relevant documents. The core innovation is \textbf{option-level} voting, which aggregates votes independently for each option across multiple reasoning chains to better capture partial agreements in multi-label scenarios. Furthermore, we apply adaptive voting thresholds and rule-based post-processing to enforce logical consistency. Our \textbf{Balanced} prompting strategy explicitly optimizes for the asymmetric penalty structure. Experimental results demonstrate that our approach achieves \textbf{0.74} score (60.3\% strict accuracy) on the development set and \textbf{0.86} on the official test platform, representing a \textbf{32\%} relative improvement over single-shot baselines (0.56).
+\end{abstract}
+
+\section{Introduction}
+Every day, the world is shaped by countless events, for example, economic fluctuations, policy decisions, natural disasters, technological breakthroughs. Yet behind every headline lies a deeper question: Why did this happen? Understanding causal relationships is fundamental to human cognition and critical for intelligent systems tasked with interpreting real-world events. While LLMs have demonstrated impressive capabilities in event extraction and summarization, they still struggle with abductive reasoning, inferring plausible causes from incomplete or ambiguous evidence.
+
+SemEval-2026 Task 12 formalizes this challenge as Abductive Event Reasoning (AER), where systems must identify plausible causes for news events by selecting from multiple candidate options based on supporting documents. Unlike standard question answering that tests factual recall, AER requires synthesizing distributed evidence, distinguishing direct causes from correlations or consequences, and reasoning under uncertainty, capabilities essential for high-stakes applications such as misinformation detection, policy impact assessment, and crisis response.
+
+The task presents three unique challenges. First, the evaluation metric imposes asymmetric penalties: selecting any incorrect option yields zero points, while missing some correct options still earns partial credit (0.5 points). This structure prioritizes precision over recall, reflecting real-world scenarios where false positives are more costly than false negatives. Second, causal evidence is often incomplete, scattered across multiple documents, or only implicitly stated, requiring systems to piece together context and background knowledge. Third, multi-label selection with zero to four correct answers demands aggregation strategies that can handle partial agreements rather than voting on complete answer sets.
+
+To address these challenges, we propose a Self-Consistency with Refinement (SC-Refine) approach combining ensemble reasoning with option-level voting. Our key contributions include: 
+\begin{enumerate}
+  \item An option-level voting mechanism that aggregates votes independently for each option across 7 reasoning chains, better capturing partial agreements in multi-label scenarios;
+  \item A balanced prompting strategy optimized for asymmetric penalties with evidence-anchored analysis and causal chain validation;
+  \item A hybrid retrieval module combining BM25 and Sentence-BERT via RRF with adaptive per-option weighting;
+  \item An adaptive voting thresholds with rule-based post-processing to enforce logical consistency.
+\end{enumerate}
+
+\section{Background}
+
+\subsection{Abductive Reasoning in NLP}
+Abductive reasoning, first formalized by Charles Sanders Peirce, involves inferring the best explanation for a set of observations. In computational settings, this translates to selecting hypotheses that maximize posterior probability given evidence. Recent work has explored abductive reasoning in various NLP tasks, including story understanding~\citep{bhagavatula2020abductivecommonsense}, common-sense reasoning ~\citep{talmor2019commonsenseqa}, and scientific hypothesis generation ~\citep{zhou2024hypothesis}.
+
+The ART dataset~\citep{bhagavatula2020abductivecommonsense} focuses on narrative understanding, requiring systems to select plausible middle sentences given beginning and ending contexts. However, these tasks typically involve clearly structured narratives with complete information. In contrast, SemEval-2026 Task 12 addresses real-world news events where causal evidence is incomplete, distributed across multiple documents, and often implicit, presenting additional challenges for abductive inference.
+
+\subsection{Document Retrieval for Question Answering}
+Effective question answering requires retrieving relevant documents from large corpora. Traditional approaches like BM25~\citep{robertson2009probabilistic} provide strong lexical matching based on term frequency and inverse document frequency. Neural methods using dense embeddings, such as Sentence-BERT~\citep{reimers2019sentence} and Dense Passage Retrieval~\citep{karpukhin2020dense}, capture semantic similarity beyond exact keyword matches.
+
+Hybrid approaches combining lexical and semantic methods have shown superior performance across various domains. Reciprocal Rank Fusion (RRF)~\citep{cormack2009reciprocal} provides a simple yet effective method for merging rankings from multiple retrieval systems without requiring score normalization. Recent work~\citep{bruch2022analysis} has analyzed various fusion functions, demonstrating that RRF achieves robust performance across different ranking distributions.
+
+\subsection{Large Language Models for Reasoning}
+The emergence of large language models (LLMs) has demonstrated impressive reasoning capabilities through carefully designed prompting techniques. Chain-of-Thought (CoT) prompting~\citep{wei2022chain} encourages models to generate intermediate reasoning steps, significantly improving performance on complex reasoning tasks including arithmetic, symbolic manipulation, and common-sense reasoning.
+
+Self-consistency~\citep{wang2022selfconsistency} extends CoT by sampling multiple reasoning paths and selecting the most consistent answer through majority voting. This approach improves reliability by aggregating diverse reasoning chains, reducing the impact of individual errors or hallucinations.
+
+However, traditional self-consistency votes on complete answer sets, treating different combinations (e.g., \{A, B\} versus \{A, C\}) as entirely distinct predictions. This approach suffers from vote fragmentation in multi-label scenarios where reasoning chains may partially agree. Our work addresses this limitation through option-level voting.
+
+\section{System overview}
+
+Our system employs a \textbf{Self-Consistency with Refinement (SC-Refine)} approach that combines ensemble reasoning with option-level voting to address the abductive event reasoning task. The pipeline consists of three main stages: document retrieval, multi-sample generation with self-consistency, and option-level aggregation with post-processing. The ``refinement'' in SC-Refine refers to deterministic post-processing rules rather than additional LLM-based refinement, maintaining computational efficiency.
+
+\subsection{Model Selection}
+We utilize \textbf{DeepSeek-R1} as our primary large language model, selected for its strong reasoning capabilities demonstrated in complex logical tasks. The model is deployed with temperature $=0.5$ and top-$p=0.95$ to balance diversity and coherence in generated responses across multiple reasoning chains.
+
+\subsection{Document Retrieval Strategy}
+We employ a \textbf{hybrid retrieval system} combining lexical matching (BM25) and semantic search (Sentence-BERT: all-MiniLM-L6-v2) with Reciprocal Rank Fusion (RRF, $k=60$) to identify the top-10 most relevant documents from the corpus. The RRF score for a document $d$ is computed as:
+\[
+\mathrm{RRF}(d)=\sum_{m \in \{\mathrm{BM25},\,\mathrm{SBERT}\}} \frac{1}{k + \mathrm{rank}_{m}(d)}.
+\]
+
+We configure the retrieval system with two key settings: (1) \textbf{Full content processing}---we index and retrieve complete document texts rather than title snippets only, as preliminary experiments showed that causal evidence frequently appears in body content rather than titles; (2) \textbf{Per-option retrieval}---documents are retrieved separately for the target event (weight $2\times$) and each candidate option (weight $1\times$), then merged using weighted RRF to ensure comprehensive coverage of option-specific evidence.
+
+\subsection{Prompt Engineering}
+We develop a \textbf{balanced prompting strategy} that explicitly optimizes for the task's evaluation metric:
+\begin{itemize}
+  \item Perfect match ($P = G$): 1.0 points
+  \item Partial match ($P \subset G$, no errors): 0.5 points
+  \item Any wrong selection: 0.0 points
+\end{itemize}
+
+The asymmetric penalty structure (wrong selection $=0$ points, missing correct $=0.5$ points) fundamentally shapes our prompt design. The prompt incorporates three critical components:
+\begin{enumerate}
+  \item \textbf{Evidence-anchored analysis:} The model is required to quote direct textual evidence from documents for each candidate option in a structured table format, marking options with ``NONE'' when evidence is absent. This structured format reduces hallucination and grounds reasoning in retrieved documents.
+  \item \textbf{Causal chain validation:} The prompt includes explicit warnings to distinguish direct causes from consequences, correlations, and background events (e.g., asking whether an option is a direct cause, a consequence of another option, or merely correlated).
+  \item \textbf{Conservative decision rules:} The prompt explicitly states that selecting any wrong option yields 0 points (complete failure), whereas missing some correct options can still earn partial credit, instructing the model to prioritize precision over recall.
+\end{enumerate}
+
+\subsection{Self-Consistency Framework}
+Our SC-Refine approach generates $N=7$ independent reasoning chains for each question using temperature sampling ($T=0.5$). Unlike traditional self-consistency methods that vote on complete answer sets (e.g., ``A,B'' vs. ``A,C''), we implement \textbf{option-level voting} to better handle multi-label selection:
+\begin{enumerate}
+  \item Generate 7 responses with identical prompts but stochastic sampling.
+  \item Parse each response to extract selected options using the regex pattern: \texttt{Final Answer I Reasoned: [A-D](,[A-D])*}.
+  \item Count votes for each option independently: $V_A, V_B, V_C, V_D \in [0,7]$.
+  \item Apply adaptive thresholds: general options (A/B/C) are selected if votes $\ge 4/7$ (57\%), while option D is selected if votes $\ge 5/7$ (71\%).
+\end{enumerate}
+
+The stricter threshold for option D ($\theta_D=5/7$ versus $\theta_{\text{gen}}=4/7$) is motivated by empirical observations, requiring higher confidence to avoid false positives. If no option reaches the threshold, we select the option(s) with the highest vote count to ensure at least one answer, as required by the task rules.
+
+This option-level voting strategy provides two key advantages over answer-set voting: (1) it captures partial agreements between reasoning chains (e.g., chains agreeing on option A but disagreeing on B/C), and (2) it provides finer-grained confidence signals for individual options, enabling adaptive thresholding.
+
+\subsection{Post-Processing Logic}
+We implement logical consistency checks to handle edge cases and enforce task constraints:
+\begin{itemize}
+  \item \textbf{Duplicate option handling:} When multiple options contain identical or nearly identical text (detected via string matching after normalization), they are treated as a single logical unit. If one is selected by voting, all duplicates are automatically selected to maintain logical consistency.
+  \item \textbf{Mutual exclusivity enforcement:} If a ``None of the others are correct'' option is selected alongside substantive options, we remove the ``None'' option as they are logically contradictory.
+  \item \textbf{Four-option anomaly detection:} When all four options receive votes above threshold, we check for clear weak options (e.g., a single vote versus $5+$ for others); otherwise, all four are retained.
+  \item \textbf{Empty answer prevention:} The system ensures at least one option is selected in the final output.
+\end{itemize}
+
+\subsection{Implementation Details}
+The system is implemented in Python with parallel processing using ThreadPoolExecutor. For the dev set (400 questions), the SC-Refine approach requires 2,800 LLM API calls (7 per question). Note that actual processing time is highly variable, depending on API response latency, rate limiting, and network conditions. The computational overhead compared to single-shot baselines is 7× in terms of API calls, but the performance gain (0.74 vs 0.56 official score) justifies the additional cost for accuracy-critical applications.
+
+
+\section{Experimental results}
+We conduct a series of experiments to evaluate the performance of our proposed framework on the SemEval 2026 Task 12: Abductive Event Reasoning.
+
+Our evaluation primarily focuses on the model's inherent capability to identify complex and multi-layered causal relationships, as well as its ability to infer reasonable antecedent explanations from evidence that is incomplete and sometimes inconsistent.
+
+\subsection{Exprimental Setup}
+\paragraph{Dataset} We utilize the official AER development set, which consists of a curated set of real-world scenarios drawn from a wide range of domains, including politics, finance, and public emergencies. Each instance includes a target event, referred to as the “effect,” along with a large collection of evidence documents from which the corresponding “cause(s)” must be abduced.
+
+\paragraph{Models}
+To ensure a broad and representative evaluation, \textbf{DeepSeek-R1}, which serves as our primary backbone due to its strong performance in long-context handling and logical reasoning. All experiments employ a semantic retrieval pipeline based on BM25 and Scentence-BERT, configured to retrieve the top-$k=10$ document snippets in order to construct a focused yet adequate context window. For our main proposed setting (\textbf{SC-Refine + Balanced}), we use a sampling temperature of $T=0.5$ and generate $N=7$ independent reasoning paths to enable majority voting, while all baseline settings use $T=0$ to maintain deterministic outputs.
+
+\paragraph{Evaluation} 
+We report three evaluation metrics: the \textit{Official Score} (1.0/0.5/0 scale), \textit{Strict Accuracy (SA)}, and \textit{Macro F1}. Among them, the Official Score is treated as the primary metric, as its design assigns partial credit to partially correct predictions while penalizing over-inference with zero scores, making it well suited for assessing abductive reasoning where precision is more important than recall.
+
+\subsection{Main Results}
+
+Table~\ref{tab:best} shows the results of the best-performing approach on the AER development set. The model correctly predicts all causal options in 241 cases and achieves partial correctness in 108 cases, while only 51 instances are fully incorrect. This result indicates that the system is able to identify correct causes without frequently selecting incorrect options. As a consequence, it achieves an official score of 0.74, demonstrating effective performance under the task’s asymmetric evaluation metric.
+
+\begin{table}[htbp]
+  \centering
+  \small
+  \caption{Best performance on the AER development set.}
+  \label{tab:best}
+  \begin{tabular}{lc}
+    \toprule
+    \textbf{Metric} & \textbf{Value} \\ \midrule
+    Correct Answers & 241 \\
+    Partial Correct& 108 \\
+    Incorrect Answers& 51 \\
+    Total Questions & 400 \\ \midrule
+    Official score & 0.74\\ \bottomrule
+  \end{tabular}
+  \vspace{1mm}
+\end{table}
+
+Table~\ref{tab:main_results} summarizes the performance across different reasoning paradigms, illustrating the significant performance gap between standard baseline approaches and our refined methodology.
+
+\begin{table*}[htbp]
+  \centering
+  \caption{Performance comparison on the AER development set.}
+  \label{tab:main_results}
+  \begin{tabular}{clccccc} % l=left, c=center
+    \toprule
+    \textbf{Approach} & \textbf{Prompt} & \textbf{Model$^{\dagger}$} & \textbf{Official Score} & \textbf{Strict Acc.} & \textbf{Partial \%} & \textbf{Macro F1} \\
+    \midrule
+
+    \multirow{3}{*}{Baseline} & Zero-shot CoT & deepseek-r1 & 0.56 & 48.00\% & 15.00\% & 0.73 \\
+                              & Conservative  & deepseek-v3.2 & 0.42 & 39.25\% & 4.75\% & 0.69 \\
+                              & Balanced      & deepseek-v3.2 & 0.47 & 41.25\% & 11.00\% & 0.67 \\
+    \midrule
+    
+    \multirow{3}{*}{Conservative} & Zero-shot CoT & deepseek-v3.2 & 0.66 & 63.00\% & 6.25\% & 0.82 \\
+                              & Conservative  & deepseek-r1 & 0.56 & 46.50\% & 19.00\% & 0.71 \\
+                              & Balanced      & deepseek-r1 & 0.52 & 45.75\% & 11.75\% & 0.71 \\
+    \midrule
+    \multirow{3}{*}{\textbf{SC-Refine}} & Zero-shot CoT & $-$ & $-$ & $-$ & $-$ & $-$ \\
+                               & Conservative  & deepseek-r1 & 0.53 & 48.00\% & 10.5\% & 0.75 \\
+                               & \textbf{Balanced} & \textbf{deepseek-r1} & \textbf{0.74} & \textbf{60.25\%} & \textbf{27.00\%} & \textbf{0.79} \\
+    \bottomrule
+  \end{tabular}
+  \vspace{1mm}
+  \centerline{\scriptsize $^{\dagger}$ Due to the expiration of the DeepSeek-R1 model provided by the API vendor, some later experiments were performed with DeepSeek-V3.2 as an alternative.}
+\end{table*}
+
+The empirical results indicate a clear differences among different reasoning strategies. The proposed \textbf{SC-Refine + Balanced} achieves an official score of \textbf{0.74} on development set (and \textbf{0.86} on official test set), corresponding to a relative improvement of \textbf{32\%} over the zero-shot CoT baseline. This improvement suggests that combining a structured reasoning framework with an ensemble-based refinement mechanism plays an important role in handling complex evidence. 
+
+In comparison, while the \textit{Conservative} approach achieves high precision due to its risk-averse design, it is still limited by lower recall, as the use of strict confidence thresholds often causes the model to exclude valid causal relationships in order to maintain certainty.
+
+\subsection{Ablation Study}
+To analyze the overall performance of our system and measure the specific impact of each architectural part, we conduct a detailed ablation study. This step is necessary to determine whether our improvements are driven by better data grounding or by improved reasoning logic.
+
+\begin{table*}[htbp]
+  \centering
+  \small
+  \caption{Ablation results on the AER development set.}
+  \label{tab:ablation}
+  \begin{tabular}{lc}
+    \toprule
+    \textbf{Configuration} & \textbf{Score} \\ \midrule
+    \textbf{Full System (SC-Refine + Balanced)} & \textbf{0.74} \\
+    \quad $-$ w/o Balanced Prompting (Unoptimized Balanced) & 0.58 ($-22.6\%$) \\
+    \quad $-$ w/o Document Retrieval (Unprocessed Knowledge) & 0.54 ($-27.0\%$) \\
+    \quad $-$ w/o Per Option Retrieval (Options Excluded from Retrieval) & 0.71 ($-4.1\%$) \\ \bottomrule
+  \end{tabular}
+  \vspace{1mm}
+  \centerline{\scriptsize $^{\dagger}$ Due to training cost considerations, the ablation study was conducted based on a sampling rate of $N=5$.}
+\end{table*}
+
+The largest decrease in performance happens when Document Retrieval is removed, resulting in a \textbf{27.0\%} drop. This shows that abductive reasoning is highly sensitive to noisy information contained in the context documents. If there is no specific process to handle these noises, the performance will be greatly reduced because the model may rely on false evidence instead of facts. 
+
+Additionally, there is a clear drop after removing Balanced prompting suggests that even with good evidence, the model still needs a clear structure for reasoning to tell the difference between actual causes and events that just happen first.
+
+
+\subsection{Case Study Analysis}
+To show in detail how our approach moves the model away from simple associations toward a better understanding of causes, we examine the "2021 Texas Power Crisis". This specific example demonstrates the system's capacity to tell the difference between the initial trigger of the crisis and the many serious problems that occurred as a result.
+
+\paragraph{Scenario and Conflict} 
+Target Event: \textit{"The Electric Reliability Council of Texas (ERCOT) initiated statewide rolling outages in February 2021."} \\
+Evidence Analysis: Document A explains how a very strong cold front made power equipment freeze and stop working; Document B describes the massive power failures that happened next and the many problems they caused for the people in the area.
+
+The core challenge is to isolate the structural failure from the resulting outage, as they are semantically nearly in daily life.
+
+\paragraph{Deep Trace Comparison} 
+\begin{itemize}
+    \item \textbf{Baseline Performance}: The Baseline CoT model picked both "extreme cold" and "outages" as the causes. It reasoned that "the power was out because there was an outage." This is circular reasoning, where the model mixes up the final result (the outages) with the actual starting cause (the equipment failure). Because the model included incorrect options in its final answer, it received a \textbf{score of 0}.
+    \item \textbf{Proposed Framework Performance}: 
+        \begin{enumerate}
+            \item \textbf{The Balanced Phase}: The model explicitly constructed a timeline, noting that the "outages" were the \textit{result} of the grid's inability to meet demand triggered by the cold. 
+            \item \textbf{The SC-Refine Phase}: Across 7 independent paths, the system identified that the outages occurred \textit{t+1} relative to the equipment failure. 6 out of 7 paths correctly rejected the "outages" option as a cause. Final selection: "extreme cold" and "natural gas infrastructure failure." \textbf{Score: 1.0}.
+        \end{enumerate}
+\end{itemize}
+
+\section{Conclusion}
+This paper presented a Self-Consistency with Refinement approach for abductive event reasoning, achieving 0.74 official score on the development set and 0.86 on the test platform, a 32\% relative improvement over baselines. Our core innovation, option-level voting, aggregates votes independently for each option across 7 reasoning chains, effectively capturing partial agreements in multi-label scenarios. Combined with balanced prompting, hybrid retrieval, and adaptive thresholds, the system demonstrates strong performance while maintaining interpretability through explicit voting statistics.
+
+However, limitations include $7\times$ computational overhead, fixed voting thresholds that may not generalize across domains, brittle rule-based post-processing, and persistent challenges in distinguishing causes from correlations under high semantic overlap. Future work could explore adaptive thresholding, LLM-based critique phases, learned post-processing models, structured causal graph reasoning, and uncertainty quantification for selective prediction.
+
+Despite these limitations, our work demonstrates that option-level self-consistency provides an effective framework for tasks with partial matching metrics, where decomposing multi-label voting to individual options better exploits ensemble information. As LLMs advance, techniques for structured ensemble reasoning will become increasingly important for accuracy-critical applications with asymmetric error costs.
+
+\bibliography{custom}
+
+\end{document}
+
