@@ -1,17 +1,22 @@
 """
-Centralized prompt storage for all approaches.
-Each prompt has a unique name with 'intro', 'system' and 'user' fields.
+项目统一 Prompt 仓库。
 
-IMPORTANT: Optimized for SemEval 2026 Task 12 evaluation metric:
-- 1.0 points: Perfect match (P = G)
-- 0.5 points: Partial match (P ⊂ G, no wrong selections)
-- 0.0 points: Any wrong selection or empty answer
+每个模板包含三个字段：
+- intro：模板简介
+- system_prompt：系统指令
+- user_prompt：用户侧任务模板
 
-Key insight: Wrong selection is severely penalized (0 points),
-while missing some correct answers still gives partial credit (0.5 points).
-Therefore, CONSERVATIVE strategy is optimal: "Better to miss one than select wrong one"
+设计原则基于官方评分：
+- 1.0：完全匹配
+- 0.5：正确子集（无错选）
+- 0.0：错选或空选
+
+因此多数模板都强调“保守选择、证据优先”。
 """
 
+# PROMPTS 是全局模板字典：
+# run.py 通过 --prompt_name 选择其中一个模板；
+# approaches.py 在组装 messages 时会注入 event/docs/options 变量。
 PROMPTS = {
     # ============================================================
     # Conservative strategy
@@ -109,14 +114,14 @@ PROMPTS = {
 
         For EACH option, complete this analysis:
 
-        **Option A**: {first_option_text}
+        **Option A**:
         - Evidence: [QUOTE exact text from document] or "NONE FOUND"
         - Temporal: Does evidence show this happened BEFORE target event? [YES/NO/UNCLEAR]
         - Causal Link: Does this CAUSE or ENABLE the target event? [YES/NO]
         - Verdict: [SELECT - with evidence] or [REJECT - insufficient evidence]
 
         **Option B**: (same format)
-        **Option C**: (same format)  
+        **Option C**: (same format)
         **Option D**: (same format)
 
         === SELECTION RULES ===

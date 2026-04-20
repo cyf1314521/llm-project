@@ -1,199 +1,208 @@
+import logging
 from typing import List, Tuple, Dict
-from rank_bm25 import BM25Okapi
+
 import numpy as np
+from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentRetriever:
     """
-    Retrieves and ranks documents based on relevance to the event.
-    Combines BM25 and vector-based retrieval using Reciprocal Rank Fusion (RRF).
+    文档检索器：
+    - 稀疏检索：BM25
+    - 稠密检索：SentenceTransformer 向量相似度
+    - 排序融合：RRF（Reciprocal Rank Fusion）
     """
 
-    def __init__(self, top_k: int = 10,
-                 use_full_content: bool = False,
-                 use_gpu: bool = False,
-                 rrf_k: int = 60,
-                 use_per_option: bool = False):
-
+    def __init__(
+        self,
+        top_k: int = 10,
+        use_full_content: bool = False,
+        use_gpu: bool = False,
+        rrf_k: int = 60,
+        use_per_option: bool = False,
+    ):
         self.top_k = top_k
         self.use_full_content = use_full_content
         self.use_gpu = use_gpu
         self.rrf_k = rrf_k
         self.use_per_option = use_per_option
-        
-        # Initialize the model
+
+        # 语义检索模型初始化
+        model_name = "all-MiniLM-L6-v2"
         try:
-            model_name = 'all-MiniLM-L6-v2'
             self.model = SentenceTransformer(model_name)
             if use_gpu:
                 try:
-                    self.model = self.model.to('cuda')
-                    print(f"Using GPU for semantic retrieval")
-                except:
-                    print(f"GPU not available, using CPU")
-            print(f"Loaded semantic retrieval model: {model_name}")
+                    self.model = self.model.to("cuda")
+                    logger.info("Using GPU for semantic retrieval")
+                except Exception:
+                    logger.warning("GPU not available, falling back to CPU")
+            logger.info("Loaded semantic retrieval model: %s", model_name)
         except Exception as e:
             raise RuntimeError(f"Failed to load model {model_name}: {e}")
 
+    def _get_indexing_texts(
+        self, title_snippet: List[str], documents: List[str]
+    ) -> List[str]:
+        """根据配置决定使用全文或 title+snippet 作为检索语料。"""
+        return documents if self.use_full_content else title_snippet
 
-    
-    def _retrieve_bm25(self, query: str, title_snippet: List[str], documents: List[str]) -> List[str]:
+    def _retrieve_bm25(
+        self, query: str, title_snippet: List[str], documents: List[str]
+    ) -> List[int]:
         """
-        Retrieve all documents using BM25 with scores.
-        Returns list of documents sorted by score descending.
-        """    
+        BM25 排序，返回文档下标（按分数降序）。
+        """
         try:
-            # Preprocessing document/snippet
-            if self.use_full_content:
-                texts_to_index = documents
-            else:
-                texts_to_index = title_snippet
-            tokenized_texts = [item.lower().split(" ") for item in texts_to_index]
-            tokenized_query = query.lower().split(" ")
-            
-            # Retrieve
+            texts = self._get_indexing_texts(title_snippet, documents)
+            tokenized_texts = [t.lower().split() for t in texts]
+            tokenized_query = query.lower().split()
+
             bm25 = BM25Okapi(tokenized_texts)
             scores = bm25.get_scores(tokenized_query)
-            sorted_indices = np.argsort(scores)[::-1]
-            
-            results = [documents[i] for i in sorted_indices]
-            return results
-           
-        except Exception as e:
-            print(f"Warning: BM25 retrieval failed ({e}).")
-            return None
-        
+            return np.argsort(scores)[::-1].tolist()
 
-    def _retrieve_semantic(self, query: str, title_snippet: List[str], documents: List[str]) -> List[str]:
+        except Exception as e:
+            logger.warning("BM25 retrieval failed: %s", e)
+            return None
+
+    def _retrieve_semantic(
+        self, query: str, title_snippet: List[str], documents: List[str]
+    ) -> List[int]:
         """
-        Semantic retriever using vector embeddings (sentence transformers).
-        Returns list of documents sorted by similarity descending.
+        向量语义排序，返回文档下标（按相似度降序）。
         """
         try:
-            if self.use_full_content:
-                texts_to_index = documents
-            else:
-                texts_to_index = title_snippet
-            
-            # Encode query and documents
+            texts = self._get_indexing_texts(title_snippet, documents)
+
             query_embedding = self.model.encode(
                 [query],
                 convert_to_numpy=True,
                 show_progress_bar=False,
                 normalize_embeddings=True,
             )
-
             doc_embeddings = self.model.encode(
-                texts_to_index,
+                texts,
                 convert_to_numpy=True,
                 show_progress_bar=False,
                 batch_size=32,
                 normalize_embeddings=True,
             )
 
-            # Calculate cosine similarity
             similarities = np.dot(doc_embeddings, query_embedding.T).flatten()
+            return np.argsort(similarities)[::-1].tolist()
 
-            # Sort all documents by similarity descending
-            sorted_indices = np.argsort(similarities)[::-1]
-
-            results = [documents[i] for i in sorted_indices]
-            return results
-            
         except Exception as e:
-            print(f"Warning: Vector retrieval failed ({e})")
+            logger.warning("Semantic retrieval failed: %s", e)
             return None
-        
-    
-    def _rrf_merge(self, bm25_results: List[str], 
-                   vector_results: List[str]) -> List[Tuple[str, float]]:
-        """
-        Merge results from BM25 and vector retrieval using Reciprocal Rank Fusion (RRF).
-        RRF score: 1 / (k + rank)
-        """
-        rrf_scores: Dict[str, float] = {}
 
-        # Process BM25 results
-        for rank, doc in enumerate(bm25_results, 1):
-            rrf_scores[doc] = rrf_scores.get(doc, 0) + 1.0 / (self.rrf_k + rank)
-
-        # Process vector results
-        for rank, doc in enumerate(vector_results, 1):
-            rrf_scores[doc] = rrf_scores.get(doc, 0) + 1.0 / (self.rrf_k + rank)
-
-        # Sort by RRF score descending
-        merged_results = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
-        return merged_results[:self.top_k]
-    
-
-    def retrieve(self, event: str, title_snippet: List[str], documents: List[str], options: List[str] = None) -> List[str]:
+    def _rrf_merge(
+        self,
+        bm25_ranking: List[int],
+        semantic_ranking: List[int],
+        num_docs: int,
+    ) -> List[int]:
         """
-        Retrieve top_k documents using combined BM25 and vector retrieval with RRF.
-        If use_per_option is True and options are provided, use per-option retrieval.
+        使用 RRF 融合 BM25 与语义检索结果。
+        融合对象是“文档下标”而不是文本，避免文本去重冲突。
         """
-        # If per-option is True and options are provided, use this new method
+        rrf_scores = [0.0] * num_docs
+
+        for rank, idx in enumerate(bm25_ranking, 1):
+            rrf_scores[idx] += 1.0 / (self.rrf_k + rank)
+
+        for rank, idx in enumerate(semantic_ranking, 1):
+            rrf_scores[idx] += 1.0 / (self.rrf_k + rank)
+
+        scored = [(idx, score) for idx, score in enumerate(rrf_scores) if score > 0]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [idx for idx, _ in scored[: self.top_k]]
+
+    def retrieve(
+        self,
+        event: str,
+        title_snippet: List[str],
+        documents: List[str],
+        options: List[str] = None,
+    ) -> List[str]:
+        """
+        标准检索入口：
+        - 默认：事件查询 + 混合检索 + RRF
+        - 可选：use_per_option 开启后切换到“事件+选项加权检索”
+        """
         if self.use_per_option and options:
-            return self.retrieve_with_options(event, options, title_snippet, documents)
-        
+            return self.retrieve_with_options(
+                event, options, title_snippet, documents
+            )
+
         if not documents:
             return []
-        
+
+        # 文档总量不超过 top_k 时直接全返回，减少无意义计算
         if len(documents) <= self.top_k:
             return documents
-    
-        # Get results from both methods (all documents ranked)
-        bm25_results = self._retrieve_bm25(event, title_snippet, documents)
-        vector_results = self._retrieve_semantic(event, title_snippet, documents)
 
-        if not vector_results:
-            if not bm25_results:
+        bm25_ranking = self._retrieve_bm25(event, title_snippet, documents)
+        semantic_ranking = self._retrieve_semantic(event, title_snippet, documents)
+
+        if not semantic_ranking:
+            if not bm25_ranking:
                 return documents
-            else:
-                return [doc for doc in bm25_results[:self.top_k]]
-            
-        # Merge using RRF
-        merged_results = self._rrf_merge(bm25_results, vector_results)
-        return [doc for doc, _ in merged_results]
-    
+            return [documents[i] for i in bm25_ranking[: self.top_k]]
 
-    def retrieve_with_options(self, event: str, options: List[str],
-                              title_snippet: List[str], documents: List[str]) -> List[str]:
+        merged_indices = self._rrf_merge(
+            bm25_ranking, semantic_ranking, len(documents)
+        )
+        return [documents[i] for i in merged_indices]
+
+    def retrieve_with_options(
+        self,
+        event: str,
+        options: List[str],
+        title_snippet: List[str],
+        documents: List[str],
+    ) -> List[str]:
         """
-        Retrieve event + options related documents
-        Event's weight 2x，Option's weight 1x (BM25 + Semantic)
+        事件+选项加权检索：
+        - 事件相关性权重 2x
+        - 每个选项相关性权重 1x
+        适合多选因果题，能提升对候选项的证据覆盖。
         """
         if not documents:
             return []
-        
+
         if len(documents) <= self.top_k:
             return documents
-        
-        all_scores: Dict[str, float] = {}
-        
-        # 1. Event related (weight 2x)
+
+        num_docs = len(documents)
+        all_scores = [0.0] * num_docs
+
+        # 事件查询部分（权重 2x）
         bm25_event = self._retrieve_bm25(event, title_snippet, documents)
         vec_event = self._retrieve_semantic(event, title_snippet, documents)
-        
+
         if bm25_event:
-            for rank, doc in enumerate(bm25_event, 1):
-                all_scores[doc] = all_scores.get(doc, 0) + 2.0 / (self.rrf_k + rank)
+            for rank, idx in enumerate(bm25_event, 1):
+                all_scores[idx] += 2.0 / (self.rrf_k + rank)
         if vec_event:
-            for rank, doc in enumerate(vec_event, 1):
-                all_scores[doc] = all_scores.get(doc, 0) + 2.0 / (self.rrf_k + rank)
-        
-        # 2. each option related (weight 1x, BM25 + Semantic)
+            for rank, idx in enumerate(vec_event, 1):
+                all_scores[idx] += 2.0 / (self.rrf_k + rank)
+
+        # 选项查询部分（每项权重 1x）
         for option in options:
             bm25_opt = self._retrieve_bm25(option, title_snippet, documents)
             vec_opt = self._retrieve_semantic(option, title_snippet, documents)
-            
+
             if bm25_opt:
-                for rank, doc in enumerate(bm25_opt, 1):
-                    all_scores[doc] = all_scores.get(doc, 0) + 1.0 / (self.rrf_k + rank)
+                for rank, idx in enumerate(bm25_opt, 1):
+                    all_scores[idx] += 1.0 / (self.rrf_k + rank)
             if vec_opt:
-                for rank, doc in enumerate(vec_opt, 1):
-                    all_scores[doc] = all_scores.get(doc, 0) + 1.0 / (self.rrf_k + rank)
-        
-        # return top_k
-        sorted_docs = sorted(all_scores.items(), key=lambda x: x[1], reverse=True)
-        return [doc for doc, _ in sorted_docs[:self.top_k]]
+                for rank, idx in enumerate(vec_opt, 1):
+                    all_scores[idx] += 1.0 / (self.rrf_k + rank)
+
+        scored = [(idx, score) for idx, score in enumerate(all_scores) if score > 0]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return [documents[idx] for idx, _ in scored[: self.top_k]]
